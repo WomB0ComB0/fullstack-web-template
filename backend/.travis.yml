@@ -1,0 +1,34 @@
+sudo: required
+
+language: python
+python:
+  - '3.11'
+
+services:
+  - docker
+
+# We need to run our own couchdb because Travis doesn't use credentials
+before_install:
+  - docker pull couchdb:latest
+  - docker run -d --name couchdb -p 5984:5984 -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=pass
+    couchdb:latest
+  - docker ps -a
+
+env:
+  - BINDING_CLOUDANT='{"username":"admin","password":"pass","host":"localhost","port":5984,"url":"http://admin:pass@localhost:5984"}'
+
+# command to install dependencies
+install: 
+  - python -m pip install -U pip poetry
+  - poetry config virtualenvs.create false
+  - poetry install
+
+before_script:
+  - curl -X GET http://localhost:5984/
+  - curl -X PUT http://admin:pass@localhost:5984/test
+
+script:
+  - pytest
+
+after_success:
+  - codecov

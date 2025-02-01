@@ -1,0 +1,14 @@
+---
+# This manifest deploys a Python Flask application with a Redis database
+applications:
+- name: flask-swagger
+  path: .
+  memory: 64M
+  instances: 1
+  #random-route: true
+  host: flask-swagger
+  domain: mybluemix.net
+  disk_quota: 512M
+  buildpack: python_buildpack
+  services:
+  - Cloudant

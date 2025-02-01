@@ -1,0 +1,71 @@
+// spell: disable
+{
+	"name": "Python & CouchDB",
+	"dockerComposeFile": "docker-compose.yml",
+	"service": "app",
+	"workspaceFolder": "/app",
+	"remoteUser": "devops",
+	"customizations": {
+		"vscode": {
+			"settings": {
+				"cSpell.words": [
+					"sqlalchemy",
+					"psycopg",
+					"pytest",
+					"virtualenvs"
+				],
+				"[python]": {
+					"editor.defaultFormatter": "ms-python.black-formatter",
+					"editor.formatOnSave": true
+				},
+				"git.mergeEditor": true,
+				"markdown-preview-github-styles.colorTheme": "light",
+				"makefile.extensionOutputFolder": "/tmp",
+				"python.testing.unittestEnabled": false,
+				"python.testing.pytestEnabled": true,
+				"python.testing.pytestArgs": [
+					"tests"
+				],
+				"files.exclude": {
+					"**/.git": true,
+					"**/.DS_Store": true,
+					"**/*.pyc": true,
+					"**/__pycache__": true,
+					"**/.pytest_cache": true
+				}
+			},
+			"extensions": [
+				"VisualStudioExptTeam.vscodeintellicode",
+				"ms-python.python",
+				"ms-python.vscode-pylance",
+				"ms-python.debugpy",
+				"ms-python.pylint",
+				"ms-python.flake8",
+				"ms-python.black-formatter",
+				"njpwerner.autodocstring",
+				"wholroyd.jinja",
+				"cstrap.flask-snippets",
+				"ms-vscode.makefile-tools",
+				"yzhang.markdown-all-in-one",
+				"bierner.github-markdown-preview",
+				"davidanson.vscode-markdownlint",
+				"hnw.vscode-auto-open-markdown-preview",
+				"bierner.markdown-preview-github-styles",
+				"tamasfe.even-better-toml",
+				"donjayamanne.githistory",
+				"GitHub.vscode-pull-request-github",
+				"hbenl.vscode-test-explorer",
+				"LittleFoxTeam.vscode-python-test-adapter",
+				"redhat.vscode-yaml",
+				"rangav.vscode-thunder-client",
+				"ms-azuretools.vscode-docker",
+				"github.vscode-github-actions",
+				"streetsidesoftware.code-spell-checker",
+				"bbenoist.vagrant"
+			]
+		}
+	},
+	// Create .env file if it doesn't exist
+	"postCreateCommand": "if [ ! -f .env ]; then cp dot-env-example .env; fi;",
+	"forwardPorts": [8080]
+}
