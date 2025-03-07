@@ -1,13 +1,15 @@
 """
 Global Configuration for Application
 """
+
 import os
 import logging
 
 LOGGING_LEVEL = logging.INFO
 
-# Get the database name to use
-CLOUDANT_DBNAME = os.getenv("CLOUDANT_DBNAME", "petshop")
+# Get configuration from environment
+# psycopg2 connection string format: postgresql://username:password@host:port/dbname
+DATABASE_URI = os.getenv("DATABASE_URI", "postgresql://postgres:postgres@postgres:5432/people")
 
 # Secret for session management
 SECRET_KEY = os.getenv("SECRET_KEY", "sup3r-s3cr3t-for-dev")

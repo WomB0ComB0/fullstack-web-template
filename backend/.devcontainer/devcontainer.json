@@ -1,6 +1,6 @@
 // spell: disable
 {
-	"name": "Python & CouchDB",
+	"name": "Python & PostgreSQL",
 	"dockerComposeFile": "docker-compose.yml",
 	"service": "app",
 	"workspaceFolder": "/app",

@@ -1,42 +1,19 @@
-# spell: ignore Rofrano VCAP dbname SQLDB Kubernetes
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+# pylint: disable=W0622
+
 """
-Base Model that uses Cloudant
+Models for People Service
 
-You must initialize this class before use by calling initialize().
-This class looks for an environment variable called VCAP_SERVICES
-to get it's database credentials from. If it cannot find one, it
-tries to connect to Cloudant on the localhost. If that fails it looks
-for a server name 'cloudant' to connect to.
-
-To use with Docker couchdb database use:
-    docker run -d --name couchdb -p 5984:5984 -e COUCHDB_USER=admin -e COUCHDB_PASSWORD=pass couchdb
-
-Docker Note:
-    CouchDB uses /opt/couchdb/data to store its data, and is exposed as a volume
-    e.g., to use current folder add: -v $(pwd):/opt/couchdb/data
-    You can also use Docker volumes like this: -v couchdb_data:/opt/couchdb/data
+All of the models are stored in this module
 """
-
 import os
-import json
 import logging
-from retry import retry
-from cloudant.client import Cloudant
-from cloudant.query import Query
-from cloudant.adapters import Replay429Adapter
-from cloudant.database import CloudantDatabase
-from requests import HTTPError, ConnectionError  # pylint: disable=redefined-builtin
+import psycopg2
+from psycopg2.extras import RealDictCursor
+from datetime import date
 
-# get configuration from environment (12-factor)
-ADMIN_PARTY = os.getenv("ADMIN_PARTY", "False").lower() == "true"
-CLOUDANT_HOST = os.getenv("CLOUDANT_HOST", "localhost")
-CLOUDANT_USERNAME = os.getenv("CLOUDANT_USERNAME", "admin")
-CLOUDANT_PASSWORD = os.getenv("CLOUDANT_PASSWORD", "pass")
-
-# global variables for retry (must be int)
-RETRY_COUNT = int(os.getenv("RETRY_COUNT", "10"))
-RETRY_DELAY = int(os.getenv("RETRY_DELAY", "1"))
-RETRY_BACKOFF = int(os.getenv("RETRY_BACKOFF", "2"))
+logger = logging.getLogger("flask.app")
 
 
 class DatabaseConnectionError(Exception):
@@ -46,309 +23,267 @@ class DatabaseConnectionError(Exception):
 class DataValidationError(Exception):
     """Custom Exception with data validation fails"""
 
-class Base:
+
+class Person:
     """
-    Class that represents a Base model
-
-    This version uses a NoSQL database for persistence
+    Class that represents a Person
     """
 
-    logger = logging.getLogger(__name__)
-    client: Cloudant = None
-    database: CloudantDatabase = None
+    app = None
+    conn = None
 
-    def __init__(
-        self,
-        name: str = None,
-    ):
+    def __init__(self, id=None, name="", email="", phone=None, address=None, active=True, date_joined=None):
         """Constructor"""
-        self.id = None  # pylint: disable=invalid-name
+        self.id = id
         self.name = name
+        self.email = email
+        self.phone = phone
+        self.address = address
+        self.active = active
+        self.date_joined = date_joined
 
     def __repr__(self):
-        return f"<Base {self.name} id=[{self.id}]>"
+        return f"<Person {self.name} id=[{self.id}]>"
 
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
     def create(self):
         """
-        Creates a new record in the database
+        Creates a Person to the database
         """
-        if self.name is None:  # name is the only required field
-            raise DataValidationError("name attribute is not set")
+        logger.info("Creating %s", self.name)
+
+        # Check if required fields are present
+        if not self.name or not self.email:
+            raise DataValidationError("Name and email are required fields")
 
         try:
-            document = self.database.create_document(self.serialize())
-        except HTTPError as err:
-            Base.logger.warning("Create failed: %s", err)
-            return
+            cursor = Person.conn.cursor()
+            cursor.execute(
+                """
+                INSERT INTO people(name, email, phone, address, active, date_joined)
+                VALUES (%s, %s, %s, %s, %s, %s) RETURNING id
+                """,
+                (self.name, self.email, self.phone, self.address, self.active, self.date_joined),
+            )
+            self.id = cursor.fetchone()[0]
+            Person.conn.commit()
+            cursor.close()
+        except psycopg2.Error as e:
+            Person.conn.rollback()
+            logger.error("Database error: %s", e)
+            raise DataValidationError(f"Database error: {str(e)}") from e
 
-        if document.exists():
-            self.id = document["_id"]
-
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
     def update(self):
-        """Updates a record in the database"""
-        try:
-            document = self.database[self.id]  # pylint: disable=unsubscriptable-object)
-        except KeyError:
-            document = None
-        if document:
-            document.update(self.serialize())
-            document.save()
+        """
+        Updates a Person to the database
+        """
+        logger.info("Saving %s", self.name)
+        if not self.id:
+            raise DataValidationError("Update called with empty ID field")
 
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def delete(self):
-        """Deletes a record from the database"""
         try:
-            document = self.database[self.id]  # pylint: disable=unsubscriptable-object)
-        except KeyError:
-            document = None
-        if document:
-            document.delete()
+            cursor = Person.conn.cursor()
+            cursor.execute(
+                """
+                UPDATE people
+                SET name=%s, email=%s, phone=%s, address=%s, active=%s, date_joined=%s
+                WHERE id=%s
+                """,
+                (self.name, self.email, self.phone, self.address, self.active, self.date_joined, self.id),
+            )
+            Person.conn.commit()
+            cursor.close()
+        except psycopg2.Error as e:
+            Person.conn.rollback()
+            logger.error("Database error: %s", e)
+            raise DataValidationError(f"Database error: {str(e)}") from e
+
+    def delete(self):
+        """Removes a Person from the data store"""
+        logger.info("Deleting %s", self.name)
+        try:
+            cursor = Person.conn.cursor()
+            cursor.execute("DELETE FROM people WHERE id=%s", (self.id,))
+            Person.conn.commit()
+            cursor.close()
+        except psycopg2.Error as e:
+            Person.conn.rollback()
+            logger.error("Database error: %s", e)
+            raise DataValidationError(f"Database error: {str(e)}") from e
 
     def serialize(self) -> dict:
-        """serializes a record into a dictionary"""
-        data = {
-            "name": self.name
+        """Serializes a Person into a dictionary"""
+        return {
+            "id": self.id,
+            "name": self.name,
+            "email": self.email,
+            "phone": self.phone,
+            "address": self.address,
+            "active": self.active,
+            "date_joined": self.date_joined.isoformat() if self.date_joined else None,
         }
-        if self.id:
-            data["_id"] = self.id
-        return data
 
-    def deserialize(self, data: dict) -> None:
-        """deserializes a record by marshalling the data.
-
-        :param data: a Python dictionary representing a record.
+    def deserialize(self, data: dict):
         """
-        Base.logger.info("deserialize(%s)", data)
+        Deserializes a Person from a dictionary
+
+        Args:
+            data (dict): A dictionary containing the Person data
+        """
         try:
             self.name = data["name"]
+            self.email = data["email"]
+            if "phone" in data:
+                self.phone = data["phone"]
+            if "address" in data:
+                self.address = data["address"]
+            if "active" in data:
+                self.active = data["active"]
+            if "date_joined" in data and data["date_joined"] is not None:
+                self.date_joined = (
+                    date.fromisoformat(data["date_joined"]) if isinstance(data["date_joined"], str) else data["date_joined"]
+                )
         except KeyError as error:
-            raise DataValidationError("Invalid record: missing " + error.args[0]) from error
+            raise DataValidationError("Invalid Person: missing " + error.args[0]) from error
         except TypeError as error:
-            raise DataValidationError("Invalid record: body of request contained bad or no data") from error
-
-        # if there is no id and the data has one, assign it
-        if not self.id and "_id" in data:
-            self.id = data["_id"]
-
+            raise DataValidationError("Invalid Person: body of request contained bad or no data") from error
         return self
 
-    ######################################################################
-    #  S T A T I C   D A T A B S E   M E T H O D S
-    ######################################################################
-
     @classmethod
-    def connect(cls):
-        """Connect to the server"""
-        cls.client.connect()
+    def init_db(cls, app):
+        """Initializes the database connection"""
+        logger.info("Initializing database connection")
+        cls.app = app
+        # Get the database URI from the app config
+        database_uri = app.config["DATABASE_URI"]
 
-    @classmethod
-    def disconnect(cls):
-        """Disconnect from the server"""
-        cls.client.disconnect()
-
-    @classmethod
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def create_query_index(cls, field_name: str, order: str = "asc"):
-        """Creates a new query index for searching"""
-        cls.database.create_query_index(
-            index_name=field_name, fields=[{field_name: order}]
-        )
-
-    @classmethod
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def remove_all(cls):
-        """Removes all documents from the database (use for testing)"""
-        for document in cls.database:  # pylint: disable=(not-an-iterable
-            document.delete()
-
-    @classmethod
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def all(cls):
-        """Query that returns all records"""
-        results = []
-        for doc in cls.database:  # pylint: disable=not-an-iterable
-            record = Base().deserialize(doc)
-            record.id = doc["_id"]
-            results.append(record)
-        return results
-
-    ######################################################################
-    #  F I N D E R   M E T H O D S
-    ######################################################################
-
-    @classmethod
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def find_by(cls, **kwargs):
-        """Find records using selector"""
-        query = Query(cls.database, selector=kwargs)
-        results = []
-        for doc in query.result:
-            record = Base()
-            record.deserialize(doc) 
-            results.append(record)
-        return results
-
-    @classmethod
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def find(cls, record_id: str):
-        """Query that finds records by their id"""
         try:
-            document = cls.database[record_id]  # pylint: disable=unsubscriptable-object
-            # Cloudant doesn't delete documents. :( It leaves the _id with no data
-            # so we must validate that _id that came back has a valid _rev
-            # if this next line throws a KeyError the document was deleted
-            _ = document["_rev"]
-            return Base().deserialize(document)
-        except KeyError:
+            cls.conn = psycopg2.connect(database_uri)
+            # Create the table if it doesn't exist
+            cursor = cls.conn.cursor()
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS people (
+                    id SERIAL PRIMARY KEY,
+                    name VARCHAR(63) NOT NULL,
+                    email VARCHAR(120) NOT NULL UNIQUE,
+                    phone VARCHAR(32),
+                    address VARCHAR(256),
+                    active BOOLEAN NOT NULL DEFAULT TRUE,
+                    date_joined DATE
+                )
+                """
+            )
+            cls.conn.commit()
+            cursor.close()
+        except psycopg2.Error as e:
+            logger.error("Database connection error: %s", e)
+            raise DatabaseConnectionError(f"Database connection error: {str(e)}") from e
+
+    @classmethod
+    def all(cls):
+        """Returns all of the People in the database"""
+        logger.info("Processing all People")
+        try:
+            cursor = cls.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT * FROM people")
+            result = cursor.fetchall()
+            cursor.close()
+            return [cls._dict_to_person(row) for row in result]
+        except psycopg2.Error as e:
+            logger.error("Database error: %s", e)
+            return []
+
+    @classmethod
+    def find(cls, person_id):
+        """Finds a Person by their ID"""
+        logger.info("Processing lookup for id %s ...", person_id)
+        try:
+            cursor = cls.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT * FROM people WHERE id=%s", (person_id,))
+            result = cursor.fetchone()
+            cursor.close()
+            return cls._dict_to_person(result) if result else None
+        except psycopg2.Error as e:
+            logger.error("Database error: %s", e)
             return None
 
     @classmethod
-    @retry(
-        HTTPError,
-        delay=RETRY_DELAY,
-        backoff=RETRY_BACKOFF,
-        tries=RETRY_COUNT,
-        logger=logger,
-    )
-    def find_by_name(cls, name: str):
-        """Query that finds records by their name"""
-        return cls.find_by(name=name)
+    def find_by_name(cls, name):
+        """Returns all People with the given name
 
-    ############################################################
-    #  C L O U D A N T   D A T A B A S E   C O N N E C T I O N
-    ############################################################
-
-    @staticmethod
-    def __check_for_cloud_foundry_binding():
-        """Checks for Cloud Foundry environment"""
-        opts = {}
-        if "VCAP_SERVICES" in os.environ:
-            Base.logger.info("Found Cloud Foundry VCAP_SERVICES bindings")
-            vcap_services = json.loads(os.environ["VCAP_SERVICES"])
-            # Look for Cloudant in VCAP_SERVICES
-            for service in vcap_services:
-                if service.startswith("cloudantNoSQLDB"):
-                    opts = vcap_services[service][0]["credentials"]
-        return opts
-
-    @staticmethod
-    def __check_for_kubernetes_binding():
-        """Checks for Kubernetes environment"""
-        opts = {}
-        if "BINDING_CLOUDANT" in os.environ:
-            Base.logger.info("Found Kubernetes BINDING_CLOUDANT bindings")
-            opts = json.loads(os.environ["BINDING_CLOUDANT"])
-        return opts
-
-    @staticmethod
-    def __check_for_local_binding():
-        """Checks for local environment"""
-        Base.logger.info("Looking for local environment bindings")
-        opts = {
-            "username": CLOUDANT_USERNAME,
-            "password": CLOUDANT_PASSWORD,
-            "host": CLOUDANT_HOST,
-            "port": 5984,
-            "url": "http://" + CLOUDANT_HOST + ":5984/",
-        }
-        return opts
-
-    @staticmethod
-    def init_db(dbname: str = "base"):
+        Args:
+            name (string): the name of the People you want to match
         """
-        Initialized Cloudant database connection
+        logger.info("Processing name query for %s ...", name)
+        try:
+            cursor = cls.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT * FROM people WHERE name=%s", (name,))
+            result = cursor.fetchall()
+            cursor.close()
+            return [cls._dict_to_person(row) for row in result]
+        except psycopg2.Error as e:
+            logger.error("Database error: %s", e)
+            return []
+
+    @classmethod
+    def find_by_email(cls, email):
+        """Returns the Person with the given email
+
+        Args:
+            email (string): the email of the Person you want to match
         """
-        # See if we are running Cloud Foundry
-        opts = Base.__check_for_cloud_foundry_binding()
-
-        # if VCAP_SERVICES isn't found, maybe we are running on Kubernetes?
-        if not opts:
-            opts = Base.__check_for_kubernetes_binding()
-
-        # If Cloudant not found in VCAP_SERVICES or BINDING_CLOUDANT
-        # get it from the CLOUDANT_xxx environment variables
-        if not opts:
-            opts = Base.__check_for_local_binding()
-
-        if any(k not in opts for k in ("host", "username", "password", "port", "url")):
-            raise DatabaseConnectionError(
-                "Error - Failed to retrieve options. "
-                "Check that app is bound to a Cloudant service."
-            )
-
-        Base.logger.info("Cloudant Endpoint: %s", opts["url"])
+        logger.info("Processing email query for %s ...", email)
         try:
-            if ADMIN_PARTY:
-                Base.logger.info("Running in Admin Party Mode...")
-            Base.client = Cloudant(
-                opts["username"],
-                opts["password"],
-                url=opts["url"],
-                connect=True,
-                auto_renew=True,
-                admin_party=ADMIN_PARTY,
-                adapter=Replay429Adapter(retries=10, initialBackoff=0.01),
-            )
+            cursor = cls.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT * FROM people WHERE email=%s", (email,))
+            result = cursor.fetchone()
+            cursor.close()
+            return cls._dict_to_person(result) if result else None
+        except psycopg2.Error as e:
+            logger.error("Database error: %s", e)
+            return None
 
-        except ConnectionError as exc:
-            raise DatabaseConnectionError("Cloudant service could not be reached") from exc
+    @classmethod
+    def find_by_activity(cls, active=True):
+        """Returns all People by their activity status
 
-        # Create database if it doesn't exist
+        Args:
+            active (boolean): True for people that are active
+        """
+        logger.info("Processing active query for %s ...", active)
         try:
-            Base.database = Base.client[dbname]  # pylint: disable=unsubscriptable-object
-        except KeyError:
-            # Create a database using an initialized client
-            Base.database = Base.client.create_database(dbname)
-        # check for success
-        if not Base.database.exists():
-            raise DatabaseConnectionError(f"Database [{dbname}] could not be obtained")
+            cursor = cls.conn.cursor(cursor_factory=RealDictCursor)
+            cursor.execute("SELECT * FROM people WHERE active=%s", (active,))
+            result = cursor.fetchall()
+            cursor.close()
+            return [cls._dict_to_person(row) for row in result]
+        except psycopg2.Error as e:
+            logger.error("Database error: %s", e)
+            return []
+
+    @classmethod
+    def remove_all(cls):
+        """Removes all people from the database (use for testing)"""
+        try:
+            cursor = cls.conn.cursor()
+            cursor.execute("DELETE FROM people")
+            cls.conn.commit()
+            cursor.close()
+        except psycopg2.Error as e:
+            cls.conn.rollback()
+            logger.error("Database error: %s", e)
+
+    @classmethod
+    def _dict_to_person(cls, row):
+        """Converts a dictionary to a Person object"""
+        if not row:
+            return None
+        person = Person()
+        person.id = row["id"]
+        person.name = row["name"]
+        person.email = row["email"]
+        person.phone = row["phone"]
+        person.address = row["address"]
+        person.active = row["active"]
+        person.date_joined = row["date_joined"]
+        return person

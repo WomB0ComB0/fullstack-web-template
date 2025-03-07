@@ -1,6 +1,6 @@
 # spell: ignore Rofrano jsonify restx dbname
 """
-Pet Store Service with Swagger
+People Service with Swagger
 
 Paths:
 ------
@@ -12,8 +12,8 @@ from functools import wraps
 from flask import request
 from flask import current_app as app  # Import Flask application
 from flask_restx import Resource, fields, reqparse, inputs
-from service.models import Pet, Gender
 from service.common import status  # HTTP Status Codes
+from service.models import Person
 from . import api
 
 
@@ -28,24 +28,31 @@ def index():
 
 # Define the model so that the docs reflect what can be sent
 create_model = api.model(
-    #
+    "Person",
+    {
+        "name": fields.String(required=True, description="The name of the Person"),
+        "email": fields.String(required=True, description="The email address of the Person"),
+        "phone": fields.String(required=False, description="The phone number of the Person"),
+        "address": fields.String(required=False, description="The address of the Person"),
+        "active": fields.Boolean(required=False, description="Is the Person active?"),
+        "date_joined": fields.Date(required=False, description="The date the Person joined"),
+    },
 )
 
-base_model = api.inherit(
-    "BaseModel",
+person_model = api.inherit(
+    "PersonModel",
     create_model,
     {
-        "_id": fields.String(
-            readOnly=True, description="The unique id assigned internally by service"
-        ),
+        "id": fields.Integer(readOnly=True, description="The unique id assigned internally by service"),
     },
 )
 
 # query string arguments
-base_args = reqparse.RequestParser()
-base_args.add_argument(
-    "name", type=str, location="args", required=False, help="List Pets by name"
-)
+person_args = reqparse.RequestParser()
+person_args.add_argument("name", type=str, location="args", required=False, help="List People by name")
+person_args.add_argument("email", type=str, location="args", required=False, help="List Person by email")
+person_args.add_argument("active", type=inputs.boolean, location="args", required=False, help="List People by activity status")
+
 
 ######################################################################
 # Authorization Decorator
@@ -74,6 +81,7 @@ def generate_apikey():
     """Helper function used when testing API keys"""
     return secrets.token_hex(16)
 
+
 ######################################################################
 #  U T I L I T Y   F U N C T I O N S
 ######################################################################
@@ -86,5 +94,5 @@ def abort(error_code: int, message: str):
 
 
 def data_reset():
-    """Removes all Pets from the database"""
-    Pet.remove_all()
+    """Removes all People from the database"""
+    Person.remove_all()
