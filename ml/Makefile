@@ -6,6 +6,9 @@ PROJECT_NAME = ml
 PYTHON_VERSION = 3.11
 PYTHON_INTERPRETER = python
 
+# Define the path to the CSV file
+FEATURES_CSV = data/processed/features.csv
+
 #################################################################################
 # COMMANDS                                                                      #
 #################################################################################
@@ -16,7 +19,7 @@ PYTHON_INTERPRETER = python
 requirements:
 	$(PYTHON_INTERPRETER) -m pip install -U pip
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-	
+
 
 
 
@@ -29,29 +32,34 @@ clean:
 ## Lint using flake8 and black (use `make format` to do formatting)
 .PHONY: lint
 lint:
-	flake8 hackbrown
-	isort --check --diff --profile black hackbrown
-	black --check --config pyproject.toml hackbrown
+	flake8 ml
+	isort --check --diff --profile black ml
+	black --check --config pyproject.toml ml
 
 ## Format source code with black
 .PHONY: format
 format:
-	black --config pyproject.toml hackbrown
+	black --config pyproject.toml ml
 
+
+## Clean, lint, and format code
+.PHONY: clean-lint-format
+clean-lint-format: clean lint format
+	@echo "Cleaning, linting, and formatting completed"
 
 ## Download Data from storage system
 .PHONY: sync_data_down
 sync_data_down:
-	aws s3 sync s3://hackbrown/data/ \
-		data/ 
-	
+	aws s3 sync s3://ml/data/ \
+		data/
+
 
 ## Upload Data to storage system
 .PHONY: sync_data_up
 sync_data_up:
 	aws s3 sync data/ \
-		s3://hackbrown/data 
-	
+		s3://ml/data
+
 
 
 
@@ -60,7 +68,7 @@ sync_data_up:
 create_environment:
 	@bash -c "if [ ! -z `which virtualenvwrapper.sh` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
 	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
-	
+
 
 
 
@@ -72,7 +80,23 @@ create_environment:
 ## Make Dataset
 .PHONY: data
 data: requirements
-	$(PYTHON_INTERPRETER) hackbrown/dataset.py
+	$(PYTHON_INTERPRETER) ml/dataset.py
+
+## Process raw data and generate features
+.PHONY: process_data
+process_data: requirements
+	@echo "Processing data using $(FEATURES_CSV)"
+	$(PYTHON_INTERPRETER) ml/dataset.py --input $(FEATURES_CSV)
+
+## Train anomaly detection model
+.PHONY: train_model
+train_model: requirements process_data
+	$(PYTHON_INTERPRETER) ml/modeling/train.py
+
+## Generate plots from models
+.PHONY: plot_models
+plot_models: requirements
+	$(PYTHON_INTERPRETER) ml/plots.py --output-path reports/figures
 
 
 #################################################################################
