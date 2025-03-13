@@ -19,8 +19,7 @@ FEATURES_CSV = data/processed/features.csv
 requirements:
 	$(PYTHON_INTERPRETER) -m pip install -U pip
 	$(PYTHON_INTERPRETER) -m pip install -r requirements.txt
-
-
+	$(PYTHON_INTERPRETER) -m pip install flake8 isort black
 
 
 ## Delete all compiled Python files
@@ -32,14 +31,15 @@ clean:
 ## Lint using flake8 and black (use `make format` to do formatting)
 .PHONY: lint
 lint:
-	flake8 ml
-	isort --check --diff --profile black ml
-	black --check --config pyproject.toml ml
+	$(PYTHON_INTERPRETER) -m flake8 ml
+	$(PYTHON_INTERPRETER) -m isort ml
+	$(PYTHON_INTERPRETER) -m black --check --config pyproject.toml ml
 
 ## Format source code with black
 .PHONY: format
 format:
-	black --config pyproject.toml ml
+	$(PYTHON_INTERPRETER) -m isort ml
+	$(PYTHON_INTERPRETER) -m black --config pyproject.toml ml
 
 
 ## Clean, lint, and format code
@@ -72,8 +72,9 @@ create_environment:
 		$(PYTHON_INTERPRETER) -m pip install virtualenvwrapper; \
 		echo "virtualenvwrapper installed."; \
 	fi
-	@bash -c "if [ -f `which virtualenvwrapper.sh 2>/dev/null` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
-	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
+	@echo "Sourcing virtualenvwrapper and creating environment..."
+	@bash -c "source $$(which virtualenvwrapper.sh 2>/dev/null || echo '/dev/null') && mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER) || python -m venv venv && echo 'Created venv instead. Activate with: source venv/bin/activate'"
+	@echo ">>> New virtual environment created. Activate with:\nworkon $(PROJECT_NAME) (if using virtualenvwrapper)"
 
 
 

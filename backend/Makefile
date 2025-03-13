@@ -12,7 +12,12 @@ all: help
 
 venv: ## Create a Python virtual environment
 	$(info Creating Python 3 virtual environment...)
-	poetry shell
+	poetry env use python
+	poetry env info
+
+activate: ## Activate the Python virtual environment
+	$(info Activating virtual environment...)
+	poetry env activate
 
 install: ## Install Python dependencies
 	$(info Installing dependencies...)
