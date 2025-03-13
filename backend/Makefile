@@ -12,18 +12,18 @@ all: help
 
 venv: ## Create a Python virtual environment
 	$(info Creating Python 3 virtual environment...)
-	poetry env use python
+	poetry env use python3
 	poetry env info
 
 activate: ## Activate the Python virtual environment
 	$(info Activating virtual environment...)
-	poetry env activate
+	poetry shell
 
 install: ## Install Python dependencies
 	$(info Installing dependencies...)
-	poetry config virtualenvs.create false
+	poetry lock
 	poetry install
-	python -m pip install flake8 isort black
+	# Development tools are already defined in pyproject.toml
 
 lint: ## Run the linter
 	$(info Running linting...)
@@ -35,4 +35,4 @@ lint: ## Run the linter
 
 run: ## Run the service
 	$(info Starting service...)
-	honcho start
+	poetry run honcho start

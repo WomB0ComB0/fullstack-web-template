@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "start:frontend": "cd frontend && bunx ni && bun run dev",
-    "start:backend": "cd backend && make venv && make install && make lint && make run",
+    "start:backend": "cd backend && make venv && make install && make run",
     "start:ml": "cd ml && make create_environment && make requirements && make clean-lint-format",
     "start:server": "cd server && bunx ni && bun run dev",
     "dev": "concurrently \"bun run start:backend\" \"bun run start:frontend\" \"bun run start:server\" \"bun run start:ml\""

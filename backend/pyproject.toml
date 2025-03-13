@@ -16,6 +16,8 @@ urllib3 = "1.26.19" # DO NOT upgrade this!
 retry2 = "^0.9.5"
 python-dotenv = "^1.0.1"
 gunicorn = "^22.0.0"
+psycopg2-binary = "^2.9.9"  # Add this line
+
 
 [tool.poetry.group.dev.dependencies]
 honcho = "^1.1.0"

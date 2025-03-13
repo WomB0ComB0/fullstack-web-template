@@ -7,6 +7,8 @@ This module contains the microservice code for
     models
 """
 import sys
+import os
+import subprocess
 from flask import Flask
 from flask_restx import Api
 from service.common import log_handlers
@@ -62,7 +64,30 @@ def create_app():
         from service.common import error_handlers  # pylint: disable=unused-import
 
         try:
-            models.Person.init_db(app)
+            # Check if we're running in container environment, if not run docker script
+            hostname = "postgres"
+            try:
+                # Try to resolve the hostname
+                models.Person.init_db(app)
+            except Exception as error:  # pylint: disable=broad-except
+                if "could not translate host name" in str(error):
+                    app.logger.info("Starting Docker container for database...")
+                    try:
+                        # Execute the docker script to start the database container
+                        result = subprocess.run(
+                            ["docker", "compose", "up", "-d", "postgres"],
+                            check=True,
+                            capture_output=True,
+                            text=True
+                        )
+                        app.logger.info("Docker container started: %s", result.stdout)
+                        # Now try database initialization again
+                        models.Person.init_db(app)
+                    except subprocess.CalledProcessError as docker_error:
+                        app.logger.critical("Docker error: %s", docker_error)
+                        sys.exit(4)
+                else:
+                    raise  # Re-raise if it's not a hostname resolution issue
         except Exception as error:  # pylint: disable=broad-except
             app.logger.critical("%s: Cannot continue", error)
             # gunicorn requires exit code 4 to stop spawning workers when they die
