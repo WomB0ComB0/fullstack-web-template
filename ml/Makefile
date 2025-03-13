@@ -66,9 +66,14 @@ sync_data_up:
 ## Set up python interpreter environment
 .PHONY: create_environment
 create_environment:
-	@bash -c "if [ ! -z `which virtualenvwrapper.sh` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
+	@echo "Checking if virtualenvwrapper is installed..."
+	@if [ -z `which virtualenvwrapper.sh 2>/dev/null` ]; then \
+		echo "Installing virtualenvwrapper..."; \
+		$(PYTHON_INTERPRETER) -m pip install virtualenvwrapper; \
+		echo "virtualenvwrapper installed."; \
+	fi
+	@bash -c "if [ -f `which virtualenvwrapper.sh 2>/dev/null` ]; then source `which virtualenvwrapper.sh`; mkvirtualenv $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); else mkvirtualenv.bat $(PROJECT_NAME) --python=$(PYTHON_INTERPRETER); fi"
 	@echo ">>> New virtualenv created. Activate with:\nworkon $(PROJECT_NAME)"
-
 
 
 

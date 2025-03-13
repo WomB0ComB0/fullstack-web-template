@@ -3,10 +3,10 @@
   "module": "index.ts",
   "type": "module",
   "scripts": {
-    "start:frontend": "cd frontend && bun run dev",
-    "start:backend": "cd blockchain && FLASK_DEBUG=1 FLASK_APP=app.py flask run",
-    "start:ml": "cd ml && make clean-lint-format",
-    "start:server": "cd server && bun run dev",
+    "start:frontend": "cd frontend && bunx ni && bun run dev",
+    "start:backend": "cd backend && make venv && make install && make lint && make run",
+    "start:ml": "cd ml && make create_environment && make requirements && make clean-lint-format",
+    "start:server": "cd server && bunx ni && bun run dev",
     "dev": "concurrently \"bun run start:backend\" \"bun run start:frontend\" \"bun run start:server\" \"bun run start:ml\""
   },
   "devDependencies": {
@@ -15,5 +15,8 @@
   },
   "peerDependencies": {
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@antfu/ni": "^24.1.0"
   }
 }
