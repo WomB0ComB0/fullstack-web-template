@@ -1,10 +1,9 @@
 from pathlib import Path
 
 import typer
+from hackbrown.config import PROCESSED_DATA_DIR
 from loguru import logger
 from tqdm import tqdm
-
-from hackbrown.config import PROCESSED_DATA_DIR
 
 app = typer.Typer()
 

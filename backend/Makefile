@@ -1,4 +1,4 @@
-# Makefile targets for dvelopment an testing
+# Makefile targets for development and testing
 # Use make help for more info
 
 .PHONY: help
@@ -23,12 +23,13 @@ install: ## Install Python dependencies
 	$(info Installing dependencies...)
 	poetry config virtualenvs.create false
 	poetry install
+	python -m pip install flake8 isort black
 
 lint: ## Run the linter
 	$(info Running linting...)
-	flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics
-	flake8 service --count --max-complexity=10 --max-line-length=127 --statistics
-	pylint service --max-line-length=127
+	python -m flake8 service --count --select=E9,F63,F7,F82 --show-source --statistics
+	python -m flake8 service --count --max-complexity=10 --max-line-length=127 --statistics
+	python -m pylint service --max-line-length=127
 
 ##@ Runtime
 
